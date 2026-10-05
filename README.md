@@ -1,127 +1,16 @@
-# Quarkus demo: Hibernate ORM and RESTEasy
+O README.md atualizado inclui a citação do Swagger UI na seção de ferramentas do Quarkus Dev UI e como alternativa aos comandos curl.Quarkus - Padrões de Alta Performance para Ingestão e Leitura em Lote (Batch & Cursor)Este projeto de demonstração desenvolvido em Quarkus exemplifica técnicas avançadas de otimização para ingestão massiva de dados, operações atômicas de UPSERT e leitura incremental de grandes volumes com memória constante $O(1)$.O objetivo principal é oferecer um comparativo prático de vazão (throughput), consumo de memória RAM e tempo de execução entre abordagens gerenciadas por ORM (JPA/Hibernate) e instruções nativas (JDBC puro e SQL Nativo ON CONFLICT).🚀 Como Executar o Projeto LocalmentePré-requisitosJava JDK 17+Maven 3.8+Instância do PostgreSQL ativa (ou container Docker)Executando em Modo de Desenvolvimento (quarkus:dev)Para iniciar a aplicação em modo de desenvolvimento com Hot Reload e a interface Quarkus Dev UI habilitada, execute o comando na raiz do projeto:Bashmvn quarkus:dev
+Com o projeto em execução, você pode testar e interagir com a aplicação das seguintes formas:Aplicação Principal: http://localhost:8080Quarkus Dev UI: http://localhost:8080/q/devSwagger UI (Interface para Rodar os Endpoints): http://localhost:8080/q/swagger-ui/💡 Dica de Uso: Utilize a interface interativa do Swagger UI (http://localhost:8080/q/swagger-ui/) para testar todos os endpoints de inserção, cursores e UPSERT diretamente pelo navegador, preenchendo os parâmetros qtdRegistros sem a necessidade de comandos via terminal.🔍 Logs do SQL e Hibernate (application.properties)No arquivo src/main/resources/application.properties, as propriedades para exibição e formatação dos SQLs gerados pelo Hibernate vêm comentadas por padrão para evitar o overhead de I/O de terminal durante os testes de carga e benchmarks de performance.Caso deseje inspecionar as instruções SQL geradas em tempo de execução (SELECT, INSERT, UPDATE e comandos ON CONFLICT), basta descomentar as seguintes linhas:Properties# Descomente as linhas abaixo para visualizar a geração de SQL nos logs do console:
+# quarkus.hibernate-orm.log.sql=true
+# quarkus.hibernate-orm.log.bind-parameters=true
+# quarkus.hibernate-orm.sql-load-script=no-file
+Aviso de Performance: Manter os logs de SQL ativados durante o processamento de centenas de milhares de registros reduz a vazão da aplicação. Mantenha-os desativados ao realizar medições oficiais de performance.📌 Endpoints da AplicaçãoA aplicação expõe recursos REST divididos em dois domínios principais: Fruit (focado em estratégias de leitura incremental) e Product (focado em estratégias de UPSERT em lote).1. Domínio Fruit (/fruits) — Leitura Incremental & InserçõesEste recurso avalia o processamento em lote e a manutenção de memória estável $O(1)$ utilizando cursores de banco de dados e controle de First-Level Cache (detach/clear).📤 Inserção em Lote (Geração de Massa com EasyRandom)MétodoEndpointParâmetro QueryDescriçãoPOST/fruits/inserir/jpa-flushqtdRegistros (padrão: 1000)Persistência via JPA/Panache com controle de flush() e clear() a cada lote.POST/fruits/inserir/statelessqtdRegistros (padrão: 1000)Inserção direta sem First-Level Cache via Hibernate StatelessSession.POST/fruits/inserir/jdbcqtdRegistros (padrão: 1000)Inserção nativa com lote JDBC (addBatch/executeBatch).📥 Leitura Incremental com Cursor (Memory Footprint $O(1)$)MétodoEndpointParâmetro QueryDescriçãoPOST/fruits/cursor/jpa-streamqtdRegistros (padrão: 10000)Salva a massa de dados e realiza a leitura streaming via JPA Stream desanexando entidades individualmente.POST/fruits/cursor/scrollable-resultsqtdRegistros (padrão: 10000)Salva a massa de dados e realiza a leitura via cursor ScrollableResults do Hibernate.POST/fruits/cursor/jdbcqtdRegistros (padrão: 10000)Salva a massa de dados e realiza a leitura streaming via ResultSet nativo com setFetchSize() habilitado.2. Domínio Product (/products) — Processamento em Lote com UPSERTEste recurso compara o desempenho do padrão UPSERT (Inserir ou Atualizar em caso de colisão pela restrição única de negócio codigo) entre ORM traduzido e instruções nativas do SGBD.🔄 Lote de UPSERTs (Inserção/Atualização Massiva)MétodoEndpointParâmetro QueryDescriçãoPOST/products/upsert/lote/hibernate-nativeqtdRegistros (padrão: 1000)UPSERT em lote executando comando SQL nativo (INSERT ... ON CONFLICT DO UPDATE) via EntityManager.createNativeQuery().POST/products/upsert/lote/jdbcqtdRegistros (padrão: 1000)UPSERT em lote nativo executando addBatch()/executeBatch() diretamente via conexão JDBC e PreparedStatement.POST/products/upsert/lote/hibernate-managedqtdRegistros (padrão: 1000)UPSERT em lote tradicional via ORM (executa SELECT para verificar existência do código e em seguida dispara INSERT ou UPDATE gerenciado com controle de flush() e clear()).🧪 Exemplos de Execução dos EndpointsVocê pode acionar e benchmarkar as rotinas através da interface visual do Swagger UI (http://localhost:8080/q/swagger-ui/) ou via terminal com os comandos curl abaixo:Ingestão Massiva de Frutas (JDBC Native Batch)Bashcurl -X POST "http://localhost:8080/fruits/inserir/jdbc?qtdRegistros=50000"
+Processamento com Cursor JPA StreamBashcurl -X POST "http://localhost:8080/fruits/cursor/jpa-stream?qtdRegistros=20000"
+Benchmark Comparativo de UPSERT em Lote (50.000 Produtos)Bash# 1. UPSERT via SQL Nativo no Hibernate
+curl -X POST "http://localhost:8080/products/upsert/lote/hibernate-native?qtdRegistros=50000"
 
-This is a minimal CRUD service exposing a couple of endpoints over REST,
-with a front-end based on Angular so you can play with it from your browser.
+# 2. UPSERT via JDBC Nativo Puro
+curl -X POST "http://localhost:8080/products/upsert/lote/jdbc?qtdRegistros=50000"
 
-While the code is surprisingly simple, under the hood this is using:
-- [Hibernate Data Repositories (Jakarta Data)](https://hibernate.org/repositories/) to perform the CRUD operations on the database
-- RESTEasy to expose the REST endpoints
-- A PostgreSQL database; see below to run one via Docker
-- ArC, the CDI inspired dependency injection tool with zero overhead
-- The high performance Agroal connection pool
-- All safely coordinated by the Narayana Transaction Manager
-
-## Requirements
-
-To compile and run this demo you will need:
-
-- JDK 17+
-- GraalVM
-
-In addition, you will need either a PostgreSQL database, or Docker to run one.
-
-### Configuring GraalVM and JDK 17+
-
-Make sure that both the `GRAALVM_HOME` and `JAVA_HOME` environment variables have
-been set, and that a JDK 17+ `java` command is on the path.
-
-See the [Building a Native Executable guide](https://quarkus.io/guides/building-native-image)
-for help setting up your environment.
-
-## Building the demo
-
-Launch the Maven build on the checked out sources of this demo:
-
-> ./mvnw package
-
-## Running the demo
-
-### Live coding with Quarkus
-
-The Maven Quarkus plugin provides a development mode that supports
-live coding. To try this out:
-
-> ./mvnw quarkus:dev
-
-In this mode you can make changes to the code and have the changes immediately applied, by just refreshing your browser.
-
-Dev Mode automatically starts a Docker container with a Postgres database. This feature is called ["Dev Services"](https://quarkus.io/guides/dev-services).
-
-To access the database from the terminal, run:
-
-```sh
-docker exec -it <container-name> psql -U quarkus
-```
-
-    Hot reload works even when modifying your JPA entities or Jakarta Data repositories.
-    Try it! Even the database schema will be updated on the fly.
-
-### Run Quarkus in JVM mode
-
-When you're done iterating in developer mode, you can run the application as a
-conventional jar file.
-
-First compile it:
-
-> ./mvnw package
-
-Next, make sure you have a PostgreSQL database running. In production, Quarkus does not start a container for you like it does in Dev Mode.
-To set up a PostgreSQL database with Docker:
-
-> docker run -it --rm=true --name quarkus_test -e POSTGRES_USER=quarkus_test -e POSTGRES_PASSWORD=quarkus_test -e POSTGRES_DB=quarkus_test -p 5432:5432 postgres:13.3
-
-Connection properties for the Agroal datasource are defined in the standard Quarkus configuration file,
-`src/main/resources/application.properties`.
-
-Then run it:
-
-> java -jar ./target/quarkus-app/quarkus-run.jar
-
-    Have a look at how fast it boots.
-    Or measure total native memory consumption...
-
-### Run Quarkus as a native application
-
-You can also create a native executable from this application without making any
-source code changes. A native executable removes the dependency on the JVM:
-everything needed to run the application on the target platform is included in
-the executable, allowing the application to run with minimal resource overhead.
-
-Compiling a native executable takes a bit longer, as GraalVM performs additional
-steps to remove unnecessary codepaths. Use the  `native` profile to compile a
-native executable:
-
-> ./mvnw package -Dnative
-
-After getting a cup of coffee, you'll be able to run this binary directly:
-
-> ./target/hibernate-orm-jakarta-data-quickstart-1.0.0-SNAPSHOT-runner
-
-    Please brace yourself: don't choke on that fresh cup of coffee you just got.
-    
-    Now observe the time it took to boot, and remember: that time was mostly spent to generate the tables in your database and import the initial data.
-    
-    Next, maybe you're ready to measure how much memory this service is consuming.
-
-N.B. This implies all dependencies have been compiled to native;
-that's a whole lot of stuff: from the bytecode enhancements that Hibernate ORM
-applies to your entities, to the lower level essential components such as the PostgreSQL JDBC driver, the Undertow webserver.
-
-## See the demo in your browser
-
-Navigate to:
-
-<http://localhost:8080/index.html>
-
-Have fun, and join the team of contributors!
-
-## Running the demo in Kubernetes
-
-This section provides extra information for running both the database and the demo on Kubernetes.
-As well as running the DB on Kubernetes, a service needs to be exposed for the demo to connect to the DB.
-
-Then, rebuild demo docker image with a system property that points to the DB.
-
-```bash
--Dquarkus.datasource.jdbc.url=jdbc:postgresql://<DB_SERVICE_NAME>/quarkus_test
-```
+# 3. UPSERT via ORM Gerenciado (Select + Save/Update)
+curl -X POST "http://localhost:8080/products/upsert/lote/hibernate-managed?qtdRegistros=50000"
+💡 Principais Padrões de Arquitetura DemonstradosMemory Leak Prevention: Uso criterioso de entityManager.detach(entity) e session.clear() durante a iteração de cursores para garantir estabilidade da memória Heap da JVM.Stateless Processing: Ingestão desacoplada de First-Level Cache via StatelessSession e createNativeQuery().Atomics no SGBD: Eliminação de buscas prévias (SELECT) em cenários de chave única utilizando o comando SQL nativo ON CONFLICT (codigo) DO UPDATE.Respeito às Sequences do Banco: Uso de @SequenceGenerator com allocationSize = 100 alinhado à busca de IDs diretamente na sequence do banco (nextval('fruit_seq')).

@@ -65,6 +65,7 @@ Este recurso avalia o processamento em lote e a manutenção de memória estáve
 | Método | Endpoint | Parâmetro Query | Descrição |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/fruits/paginado` | `page` *(padrão: 0)*, `size` *(padrão: 20)* | **Busca Paginada Tradicional:** Retorna conteúdo paginado com metadados (`totalRegistros`, `totalPaginas`) usando Panache `Page.of()`. <br>**Obs.:** Antes de usar, utilize um dos métodos de inserção em batch, para criar os registros. |
+| `GET` | `/fruits/keyset` | `lastId` *(opcional)*, `size` *(padrão: 20)* | **Keyset Pagination (Seek-Based):** Consulta de alta performance O(1) que salta diretamente via índice (`WHERE id > lastId`). |
 | `POST` | `/fruits/inserir/jpa-flush` | `qtdRegistros` *(padrão: 1000)* | Persistência via JPA/Panache com controle de `flush()` e `clear()` a cada lote. |
 | `POST` | `/fruits/inserir/stateless` | `qtdRegistros` *(padrão: 1000)* | Inserção direta sem First-Level Cache via Hibernate `StatelessSession`. |
 | `POST` | `/fruits/inserir/jdbc` | `qtdRegistros` *(padrão: 1000)* | Inserção nativa com lote JDBC (`addBatch`/`executeBatch`). |

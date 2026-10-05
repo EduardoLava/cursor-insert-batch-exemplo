@@ -18,9 +18,13 @@ import org.jeasy.random.EasyRandomParameters;
 import org.jeasy.random.TypePredicates;
 
 @ApplicationScoped
-public class FruitService {
+public class FruitBatchService {
 
   private static final Predicate<Class<?>> HIBERNATE = TypePredicates.inPackage("org.hibernate");
+  private static final Predicate<Field> CAMPOS_EXLUIR = campo -> campo.getName().contains("$")
+      || campo.getName().contains("$$")
+      || campo.getName().contains("hibernate_")
+      || campo.getName().contains("id");
 
   @Inject
   FruitRepository repository;
@@ -30,11 +34,6 @@ public class FruitService {
 
   @ConfigProperty(name = "quarkus.hibernate-orm.jdbc.statement-batch-size")
   Integer tamanhoBatch;
-
-  private static final Predicate<Field> CAMPOS_EXLUIR = campo -> campo.getName().contains("$")
-      || campo.getName().contains("$$")
-      || campo.getName().contains("hibernate_")
-      || campo.getName().contains("id");
 
   @Transactional
   public void salvarComFlush(int qtdRegistrosGerar) {

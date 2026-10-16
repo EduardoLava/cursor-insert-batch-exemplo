@@ -32,12 +32,19 @@ public class ProductService {
    * @param quantidade
    */
   @Transactional
-  public void salvarOuAtualizarLoteViaSqlNativaHibernate(int quantidade) {
-    log.log(Level.INFO, "Gerando {0} produtos aleatórios para UPSERT SQL Nativo em lote via Hibernate", quantidade);
+  public void salvarOuAtualizarViaSqlNativaHibernate(int quantidade) {
+    log.log(Level.INFO, "Gerando {0} produtos aleatórios para UPSERT SQL Nativo via Hibernate", quantidade);
     List<Product> produtos = gerarProdutosAleatorios(quantidade);
-    productRepository.upsertEmLoteNativoComHibernate(produtos);
+    productRepository.upsertNativoComHibernate(produtos);
   }
-
+  
+  @Transactional
+  public void salvarOuAtualizarViaHqlHibernate(int quantidade) {
+    log.log(Level.INFO, "Gerando {0} produtos aleatórios para UPSERT HQL via Hibernate", quantidade);
+    List<Product> produtos = gerarProdutosAleatorios(quantidade);
+    productRepository.upsertHqlComHibernate(produtos);
+  }
+  
   /**
    * Executa UPSERT em Lote para grande volume via JDBC Nativo
    */

@@ -1,19 +1,12 @@
 package org.acme.hibernate.orm.upsert;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.SequenceGenerator;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
+import jakarta.persistence.*;
 
 @Entity
 @Table(
     name = "product",
-    uniqueConstraints = @UniqueConstraint(name = "uk_product_codigo", columnNames = "codigo")
+    uniqueConstraints = @UniqueConstraint(name = "uk_product_code", columnNames = "code")
 )
 public class Product {
 
@@ -29,7 +22,7 @@ public class Product {
     )
     private Long id;
 
-    @Column(name = "codigo", nullable = false, length = 50, unique = true)
+    @Column(nullable = false, length = 50, unique = true)
     private String code;
 
     @Column(nullable = false, length = 100)

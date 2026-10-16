@@ -5,6 +5,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import org.hibernate.StatelessSession;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -24,6 +25,9 @@ public class ProductRepository implements PanacheRepository<Product> {
 
   @Inject
   DataSource dataSource;
+  
+  @Inject
+  StatelessSession statelessSession;
 
   /**
    * Busca pela chave única (code). Se existir, atualiza os dados; caso contrário, persiste uma nova entidade.
@@ -41,15 +45,35 @@ public class ProductRepository implements PanacheRepository<Product> {
       return product;
     }
   }
+  
+  /**
+   * Upsert de todos os itens enviados na lista. Não permite envio em batch pois o método {@link Query#executeUpdate()} envia a instrução imediatamente.
+   */
+  public void upsertHqlComHibernate(List<Product> produtos) {
+      String sql = """
+              insert into Product (code, name, price)
+              values (:code, :name, :price)
+              on conflict(code) do update
+              set name = excluded.name, price = excluded.price, code = excluded.code
+          """;
+      Query query = getEntityManager().createQuery(sql);
+      for (Product p : produtos) {
+        query.setParameter("code", p.getCode());
+        query.setParameter("name", p.getName());
+        query.setParameter("price", p.getPrice());
+
+        query.executeUpdate();
+      }
+    }
 
   /**
    * Upsert em lote via sql nativa no hibernate/jpa. Para grandes volumes, executa o loop descarregando periodicamente no banco.
    */
-  public void upsertEmLoteNativoComHibernate(List<Product> produtos) {
+  public void upsertNativoComHibernate(List<Product> produtos) {
     String sql = """
-        INSERT INTO product (id, codigo, name, price)
+        INSERT INTO product (id, code, name, price)
         VALUES (nextval('product_seq'), :code, :name, :price)
-        ON CONFLICT (codigo)
+        ON CONFLICT (code)
         DO UPDATE SET
             name = EXCLUDED.name,
             price = EXCLUDED.price
@@ -57,21 +81,13 @@ public class ProductRepository implements PanacheRepository<Product> {
 
     Query query = getEntityManager().createNativeQuery(sql);
 
-    int count = 0;
     for (Product p : produtos) {
       query.setParameter("code", p.getCode());
       query.setParameter("name", p.getName());
       query.setParameter("price", p.getPrice());
 
       query.executeUpdate();
-
-      if (++count % 1000 == 0) {
-        getEntityManager().flush();
-        getEntityManager().clear();
-      }
     }
-    getEntityManager().flush();
-    getEntityManager().clear();
   }
 
   /**
@@ -79,9 +95,9 @@ public class ProductRepository implements PanacheRepository<Product> {
    */
   public void upsertEmLoteComJdbcNativo(List<Product> produtos) {
     String sql = """
-        INSERT INTO product (id, codigo, name, price)
+        INSERT INTO product (id, code, name, price)
         VALUES (nextval('product_seq'), ?, ?, ?)
-        ON CONFLICT (codigo)
+        ON CONFLICT (code)
         DO UPDATE SET
             name = EXCLUDED.name,
             price = EXCLUDED.price

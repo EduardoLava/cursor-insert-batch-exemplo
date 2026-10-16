@@ -28,17 +28,36 @@ public class ProductResource {
    * Lote via SQL Nativo (ON CONFLICT) executado pelo Hibernate EntityManager
    */
   @POST
-  @Path("upsert/lote/hibernate-native")
-  public Response upsertLoteHibernateNative(@QueryParam("qtdRegistros") @DefaultValue("1000") int qtdRegistros) {
+  @Path("upsert/hibernate-native")
+  public Response upsertHibernateNative(@QueryParam("qtdRegistros") @DefaultValue("1000") int qtdRegistros) {
     StopWatch cronometro = StopWatch.createStarted();
-    productService.salvarOuAtualizarLoteViaSqlNativaHibernate(qtdRegistros);
+    productService.salvarOuAtualizarViaSqlNativaHibernate(qtdRegistros);
     cronometro.stop();
 
-    log.log(Level.INFO, "UPSERT em lote de {0} produtos via Hibernate Native Query concluído em {1}",
+    log.log(Level.INFO, "UPSERT de {0} produtos via Hibernate Native Query concluído em {1}",
         new Object[] {qtdRegistros, cronometro});
 
     return Response.ok(Map.of(
-        "estrategia", "SQL Nativo via Hibernate (createNativeQuery ON CONFLICT Batch)",
+        "estrategia", "SQL Nativo via Hibernate (createNativeQuery ON CONFLICT)",
+        "quantidade", qtdRegistros,
+        "tempoExecucao", cronometro.toString())).build();
+  }
+  
+  /**
+   * Lote via HQL (ON CONFLICT) executado pelo Hibernate EntityManager
+   */
+  @POST
+  @Path("upsert/hibernate-hql")
+  public Response upsertHibernateHql(@QueryParam("qtdRegistros") @DefaultValue("1000") int qtdRegistros) {
+    StopWatch cronometro = StopWatch.createStarted();
+    productService.salvarOuAtualizarViaHqlHibernate(qtdRegistros);
+    cronometro.stop();
+
+    log.log(Level.INFO, "UPSERT de {0} produtos via Hibernate Query concluído em {1}",
+        new Object[] {qtdRegistros, cronometro});
+
+    return Response.ok(Map.of(
+        "estrategia", "Via Hibernate (createQuery ON CONFLICT)",
         "quantidade", qtdRegistros,
         "tempoExecucao", cronometro.toString())).build();
   }
